@@ -126,6 +126,10 @@ void RenderContext::PrepareBda() {
 	m_fault_process_pending = true;
 }
 
+void RenderContext::TickFrame() {
+	m_buffer_cache.TickFrame();
+}
+
 void RenderContext::RunGarbageCollector() {
 	if (m_fault_process_pending) {
 		m_fault_process_pending = false;
