@@ -127,6 +127,7 @@ void RenderContext::PrepareBda() {
 }
 
 void RenderContext::TickFrame() {
+	m_texture_cache.TickFrame();
 	m_buffer_cache.TickFrame();
 }
 
