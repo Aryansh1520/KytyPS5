@@ -997,14 +997,31 @@ static int ConvertHostSocketError(int error) {
 		case EAGAIN: posix_error = Posix::POSIX_EWOULDBLOCK; break;
 		case EBADF: posix_error = Posix::POSIX_EBADF; break;
 		case EFAULT: posix_error = Posix::POSIX_EFAULT; break;
+		case EINTR: posix_error = Posix::POSIX_EINTR; break;
 		case EINVAL: posix_error = Posix::POSIX_EINVAL; break;
+		case EISCONN: posix_error = Posix::POSIX_EISCONN; break;
 		case EMFILE: posix_error = Posix::POSIX_EMFILE; break;
+		case EMSGSIZE: posix_error = Posix::POSIX_EMSGSIZE; break;
 		case ENFILE: posix_error = Posix::POSIX_ENFILE; break;
 		case ENOBUFS: posix_error = Posix::POSIX_ENOBUFS; break;
 		case ENOMEM: posix_error = Posix::POSIX_ENOMEM; break;
+		case ENETDOWN: posix_error = Posix::POSIX_ENETDOWN; break;
+		case ENETRESET: posix_error = Posix::POSIX_ENETRESET; break;
+		case ENETUNREACH: posix_error = Posix::POSIX_ENETUNREACH; break;
+		case ENOTCONN: posix_error = Posix::POSIX_ENOTCONN; break;
 		case ENOTSOCK: posix_error = Posix::POSIX_ENOTSOCK; break;
+		case EOPNOTSUPP: posix_error = Posix::POSIX_EOPNOTSUPP; break;
 		case EPIPE: posix_error = Posix::POSIX_EPIPE; break;
 		case EPROTONOSUPPORT: posix_error = Posix::POSIX_EPROTONOSUPPORT; break;
+		case ESHUTDOWN: posix_error = Posix::POSIX_ESHUTDOWN; break;
+		case ETIMEDOUT: posix_error = Posix::POSIX_ETIMEDOUT; break;
+		case ECONNABORTED: posix_error = Posix::POSIX_ECONNABORTED; break;
+		case ECONNREFUSED: posix_error = Posix::POSIX_ECONNREFUSED; break;
+		case ECONNRESET: posix_error = Posix::POSIX_ECONNRESET; break;
+		case EDESTADDRREQ: posix_error = Posix::POSIX_EDESTADDRREQ; break;
+		case EHOSTUNREACH: posix_error = Posix::POSIX_EHOSTUNREACH; break;
+		case EINPROGRESS: posix_error = Posix::POSIX_EINPROGRESS; break;
+		case EALREADY: posix_error = Posix::POSIX_EALREADY; break;
 		default: break;
 	}
 #endif
