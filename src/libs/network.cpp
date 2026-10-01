@@ -2120,18 +2120,15 @@ int KYTY_SYSV_ABI Setsockopt(int s, int level, int optname, const void* optval, 
 	    optlen >= sizeof(int)) {
 		const bool enabled = *static_cast<const int*>(optval) != 0;
 #if defined(_WIN32)
-		u_long mode = enabled ? 1 : 0;
-		if (ioctlsocket(socket, FIONBIO, &mode) == SOCKET_ERROR) {
-			return SetHostSocketError();
-		}
+		u_long     mode   = enabled ? 1 : 0;
+		const bool failed = ioctlsocket(socket, FIONBIO, &mode) == SOCKET_ERROR;
 #else
-		const int flags = ::fcntl(socket, F_GETFL, 0);
-		if (flags < 0 ||
-		    ::fcntl(socket, F_SETFL, enabled ? (flags | O_NONBLOCK) : (flags & ~O_NONBLOCK)) != 0) {
-			return SetHostSocketError();
-		}
+		const int  flags = ::fcntl(socket, F_GETFL, 0);
+		const bool failed =
+		    flags < 0 ||
+		    ::fcntl(socket, F_SETFL, enabled ? (flags | O_NONBLOCK) : (flags & ~O_NONBLOCK)) != 0;
 #endif
-		return 0;
+		return failed ? SetHostSocketError() : 0;
 	}
 #if !defined(_WIN32)
 	// Guest TCP options: IPPROTO_TCP=6, TCP_NODELAY=1.
