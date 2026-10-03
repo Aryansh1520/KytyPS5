@@ -82,9 +82,8 @@ struct MouseJoystickState {
 };
 
 MouseJoystickState g_mouse;
-SDL_Window*        g_mouse_window = nullptr;
-// When the visible cursor should be hidden again; 0 while it is already hidden.
-uint64_t g_cursor_hide_at = 0;
+SDL_Window*        g_mouse_window   = nullptr;
+uint64_t           g_cursor_hide_at = 0;
 
 std::size_t ControlFromName(std::string_view name) {
 	const auto info = std::find_if(CONTROL_INFO.begin(), CONTROL_INFO.end(),
@@ -383,38 +382,21 @@ int PollMouse(uint64_t now_ms) {
 	return MOUSE_POLL_INTERVAL_MS;
 }
 
-// Touch and pen input is also reported as synthetic mouse events; those should not bring
-// the pointer back. Motion without a delta comes from window focus or cursor visibility
-// changes on some platforms rather than from the user.
 bool IsCursorActivity(const SDL_Event& event) {
-	const auto from_mouse = [](SDL_MouseID which) {
-		return which != SDL_TOUCH_MOUSEID && which != SDL_PEN_MOUSEID;
-	};
+	SDL_MouseID which;
 	switch (event.type) {
 		case SDL_EVENT_MOUSE_MOTION:
-			return from_mouse(event.motion.which) &&
-			       (event.motion.xrel != 0.0f || event.motion.yrel != 0.0f);
+			if (event.motion.xrel == 0.0f && event.motion.yrel == 0.0f) {
+				return false;
+			}
+			which = event.motion.which;
+			break;
 		case SDL_EVENT_MOUSE_BUTTON_DOWN:
-		case SDL_EVENT_MOUSE_BUTTON_UP: return from_mouse(event.button.which);
-		case SDL_EVENT_MOUSE_WHEEL: return from_mouse(event.wheel.which);
+		case SDL_EVENT_MOUSE_BUTTON_UP: which = event.button.which; break;
+		case SDL_EVENT_MOUSE_WHEEL: which = event.wheel.which; break;
 		default: return false;
 	}
-}
-
-void ShowCursorUntilIdle(uint64_t now_ms) {
-	if (g_cursor_hide_at == 0) {
-		SDL_ShowCursor();
-	}
-	g_cursor_hide_at = now_ms + CURSOR_IDLE_HIDE_MS;
-}
-
-void HideIdleCursor() {
-	SDL_HideCursor();
-	g_cursor_hide_at = 0;
-}
-
-int CursorIdleTimeout(uint64_t now_ms) {
-	return now_ms < g_cursor_hide_at ? static_cast<int>(g_cursor_hide_at - now_ms) : 0;
+	return which != SDL_TOUCH_MOUSEID && which != SDL_PEN_MOUSEID;
 }
 
 } // namespace
@@ -422,7 +404,9 @@ int CursorIdleTimeout(uint64_t now_ms) {
 void HostInputInit(SDL_Window* window) {
 	GetInputMap();
 	g_mouse_window = window;
-	HideIdleCursor();
+	if (Config::HideCursorEnabled()) {
+		g_cursor_hide_at = SDL_GetTicks() + CURSOR_IDLE_HIDE_MS;
+	}
 }
 
 void HostInputShutdown() {
@@ -433,7 +417,9 @@ void HostInputShutdown() {
 	}
 	g_mouse_window   = nullptr;
 	g_cursor_hide_at = 0;
-	SDL_ShowCursor();
+	if (Config::HideCursorEnabled()) {
+		SDL_ShowCursor();
+	}
 }
 
 void HostInputKey(int key_code, bool down) {
@@ -469,30 +455,36 @@ void HostInputToggleMouseToJoystick() {
 }
 
 bool HostInputWaitEvent(SDL_Event* event) {
-	bool has_event;
+	int timeout = -1;
 	if (!g_mouse.enabled || SDL_GetKeyboardFocus() != g_mouse_window) {
 		g_mouse.next_poll = 0;
 		CenterMouseStick();
-		if (g_cursor_hide_at == 0) {
-			has_event = SDL_WaitEvent(event);
-			if (!has_event) {
-				EXIT("%s\n", SDL_GetError());
-			}
-		} else {
-			has_event = SDL_WaitEventTimeout(event, CursorIdleTimeout(SDL_GetTicks()));
-		}
 	} else {
 		if (g_mouse.next_poll == 0) {
 			SDL_GetRelativeMouseState(nullptr, nullptr);
 			g_mouse.next_poll = SDL_GetTicks() + MOUSE_POLL_INTERVAL_MS;
 		}
-		has_event = SDL_WaitEventTimeout(event, PollMouse(SDL_GetTicks()));
+		timeout = PollMouse(SDL_GetTicks());
 	}
 
-	if (has_event && IsCursorActivity(*event)) {
-		ShowCursorUntilIdle(SDL_GetTicks());
-	} else if (g_cursor_hide_at != 0 && CursorIdleTimeout(SDL_GetTicks()) == 0) {
-		HideIdleCursor();
+	if (g_cursor_hide_at != 0) {
+		const auto now_ms = SDL_GetTicks();
+		const int  cursor_timeout =
+		    now_ms < g_cursor_hide_at ? static_cast<int>(g_cursor_hide_at - now_ms) : 0;
+		timeout = timeout < 0 ? cursor_timeout : std::min(timeout, cursor_timeout);
+	}
+	const bool has_event = SDL_WaitEventTimeout(event, timeout);
+
+	if (Config::HideCursorEnabled()) {
+		const auto now_ms = SDL_GetTicks();
+		if (has_event && !g_mouse.enabled && IsCursorActivity(*event) &&
+		    SDL_GetWindowFromEvent(event) == g_mouse_window) {
+			SDL_ShowCursor();
+			g_cursor_hide_at = now_ms + CURSOR_IDLE_HIDE_MS;
+		} else if (g_cursor_hide_at != 0 && now_ms >= g_cursor_hide_at) {
+			SDL_HideCursor();
+			g_cursor_hide_at = 0;
+		}
 	}
 
 	if (has_event && event->type == SDL_EVENT_WINDOW_FOCUS_LOST &&
